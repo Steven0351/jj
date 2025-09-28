@@ -1414,7 +1414,12 @@ to the current parents may contain changes from multiple commits.
             {
                 return Ok(PathBuf::from(x));
             }
-            std::env::var("HOME").map(|x| Path::new(&x).join(".config"))
+
+            if cfg!(windows) {
+                std::env::var("LOCALAPPDATA").map(|x| Path::new(&x).to_path_buf())
+            } else {
+                std::env::var("HOME").map(|x| Path::new(&x).join(".config"))
+            }
         }
 
         let mut git_ignores = GitIgnoreFile::empty();
