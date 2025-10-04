@@ -532,7 +532,7 @@ pub fn import_some_refs(
             },
         };
         if new_remote_ref.is_tracked() {
-            mut_repo.merge_tag(symbol.name, base_target, &new_remote_ref.target);
+            mut_repo.merge_local_tag(symbol.name, base_target, &new_remote_ref.target);
         }
         // Remote-tracking tag is the last known state of the tag in the remote.
         // It shouldn't diverge even if we had inconsistent view.
@@ -750,13 +750,10 @@ fn default_remote_ref_state_for(
 /// `view.git_refs()`. Main difference is that local branches can be moved by
 /// tracking remotes, and such mutation isn't applied to `view.git_refs()` yet.
 fn pinned_commit_ids(view: &View) -> Vec<CommitId> {
-    itertools::chain(
-        view.local_bookmarks().map(|(_, target)| target),
-        view.tags().values(),
-    )
-    .flat_map(|target| target.added_ids())
-    .cloned()
-    .collect()
+    itertools::chain(view.local_bookmarks(), view.local_tags())
+        .flat_map(|(_, target)| target.added_ids())
+        .cloned()
+        .collect()
 }
 
 /// Commits referenced by untracked remote bookmarks/tags including hidden ones.

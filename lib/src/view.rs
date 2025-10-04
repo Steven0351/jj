@@ -29,7 +29,6 @@ use crate::op_store::RemoteRef;
 use crate::ref_name::GitRefName;
 use crate::ref_name::GitRefNameBuf;
 use crate::ref_name::RefName;
-use crate::ref_name::RefNameBuf;
 use crate::ref_name::RemoteName;
 use crate::ref_name::RemoteRefSymbol;
 use crate::ref_name::WorkspaceName;
@@ -84,10 +83,6 @@ impl View {
             &self.data.remote_views,
             |view| &view.bookmarks,
         )
-    }
-
-    pub fn tags(&self) -> &BTreeMap<RefNameBuf, RefTarget> {
-        &self.data.tags
     }
 
     pub fn git_refs(&self) -> &BTreeMap<GitRefNameBuf, RefTarget> {
@@ -315,28 +310,36 @@ impl View {
         }
     }
 
-    pub fn get_tag(&self, name: &RefName) -> &RefTarget {
-        self.data.tags.get(name).flatten()
+    /// Iterates local tag `(name, target)`s in lexicographical order.
+    pub fn local_tags(&self) -> impl Iterator<Item = (&RefName, &RefTarget)> {
+        self.data
+            .local_tags
+            .iter()
+            .map(|(name, target)| (name.as_ref(), target))
     }
 
-    /// Iterates tags `(name, target)`s matching the given pattern. Entries
+    pub fn get_local_tag(&self, name: &RefName) -> &RefTarget {
+        self.data.local_tags.get(name).flatten()
+    }
+
+    /// Iterates local tag `(name, target)`s matching the given pattern. Entries
     /// are sorted by `name`.
-    pub fn tags_matching<'a, 'b>(
+    pub fn local_tags_matching<'a, 'b>(
         &'a self,
         pattern: &'b StringPattern,
     ) -> impl Iterator<Item = (&'a RefName, &'a RefTarget)> + use<'a, 'b> {
         pattern
-            .filter_btree_map_as_deref(&self.data.tags)
+            .filter_btree_map_as_deref(&self.data.local_tags)
             .map(|(name, target)| (name.as_ref(), target))
     }
 
-    /// Sets tag to point to the given target. If the target is absent, the tag
-    /// will be removed.
-    pub fn set_tag_target(&mut self, name: &RefName, target: RefTarget) {
+    /// Sets local tag to point to the given target. If the target is absent,
+    /// the local tag will be removed.
+    pub fn set_local_tag_target(&mut self, name: &RefName, target: RefTarget) {
         if target.is_present() {
-            self.data.tags.insert(name.to_owned(), target);
+            self.data.local_tags.insert(name.to_owned(), target);
         } else {
-            self.data.tags.remove(name);
+            self.data.local_tags.remove(name);
         }
     }
 
@@ -448,7 +451,7 @@ impl View {
         let op_store::View {
             head_ids,
             local_bookmarks,
-            tags,
+            local_tags,
             remote_views,
             git_refs,
             git_head,
@@ -457,7 +460,7 @@ impl View {
         itertools::chain!(
             head_ids,
             local_bookmarks.values().flat_map(ref_target_ids),
-            tags.values().flat_map(ref_target_ids),
+            local_tags.values().flat_map(ref_target_ids),
             remote_views.values().flat_map(|remote_view| {
                 let op_store::RemoteView { bookmarks, tags } = remote_view;
                 itertools::chain(bookmarks.values(), tags.values())
